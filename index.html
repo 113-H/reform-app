@@ -332,8 +332,8 @@
       <button id="maskBtn" onclick="startMask()" disabled style="padding:9px; border-radius:var(--radius-sm); border:0.5px solid var(--c-accent); background:var(--c-accent-bg); color:var(--c-accent); font-size:13px; font-weight:600; cursor:pointer;">✏️ 部分指定して変更（マスク塗り）</button>
     </div>
 
-    <div class="row">
-      <button class="btn btn-secondary" id="saveImgBtn" onclick="saveImage()" disabled>💾 保存</button>
+    <div style="text-align:center; font-size:13px; color:var(--c-muted); padding:8px 0;">
+      📱 画像を長押しして保存
     </div>
     <div style="flex:1"></div>
     <button class="btn btn-primary" onclick="analyzeItems()">リフォーム項目を分析する →</button>
@@ -579,7 +579,7 @@ async function generateImage(extraInstruction = '') {
   document.getElementById('afterImg').style.display = 'none';
   document.getElementById('afterPlaceholder').style.display = 'flex';
   document.getElementById('step3ErrorBanner').style.display = 'none';
-  document.getElementById('saveImgBtn').disabled = true;
+  
   document.getElementById('maskBtn').disabled = true;
 
   showLoading('プロンプトを最適化中...');
@@ -679,7 +679,7 @@ async function generateImage(extraInstruction = '') {
     document.getElementById('afterImg').src = outputUrl;
     document.getElementById('afterImg').style.display = 'block';
     document.getElementById('afterPlaceholder').style.display = 'none';
-    document.getElementById('saveImgBtn').disabled = false;
+    
     document.getElementById('maskBtn').disabled = false;
 
   } catch (err) {
@@ -887,7 +887,7 @@ async function applyMask() {
     document.getElementById('afterImg').src = resultUrl;
     document.getElementById('afterImg').style.display = 'block';
     document.getElementById('afterPlaceholder').style.display = 'none';
-    document.getElementById('saveImgBtn').disabled = false;
+    
     document.getElementById('maskBtn').disabled = false;
     showToast('マスク部分を変更しました');
 
