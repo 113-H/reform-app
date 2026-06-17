@@ -479,12 +479,12 @@ document.querySelectorAll('#workTypeGroup .chip').forEach(chip => {
 renderStyleThumbnails();
 
 // ===== PHOTO =====
-function handlePhoto(e) {
+async function handlePhoto(e) {
   const file = e.target.files[0];
   if (!file) return;
   state.photoMimeType = file.type;
-  const reader = new FileReader();
-  reader.onload = async ev => {
+  showLoading('写真を読み込み中...');
+  try {
     const fixedDataUrl = await fixImageRotation(file);
     state.photoDataUrl = fixedDataUrl;
     state.photoBase64 = fixedDataUrl.split(',')[1];
@@ -493,8 +493,11 @@ function handlePhoto(e) {
     document.getElementById('photoUploadArea').style.display = 'none';
     document.getElementById('step1Next').disabled = false;
     document.getElementById('step2Thumb').src = fixedDataUrl;
-  };
-  reader.readAsDataURL(file);
+  } catch(err) {
+    console.error('写真読み込みエラー:', err);
+  } finally {
+    hideLoading();
+  }
 }
 
 // ===== LOADING =====
