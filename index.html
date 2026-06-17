@@ -557,10 +557,11 @@ async function generateImage(extraInstruction = '') {
 
     const prediction = await res.json();
     if (prediction.error) throw new Error(prediction.error);
+    if (!prediction.id) throw new Error('prediction IDが取得できませんでした: ' + JSON.stringify(prediction));
 
     let result = prediction;
     let attempts = 0;
-    while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < 20) {
+    while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < 30) {
       await new Promise(r => setTimeout(r, 2000));
       const poll = await fetch(`${PROXY}/v1/predictions/${result.id}`, {
         headers: { 'Authorization': `Bearer ${replicateKey}` }
