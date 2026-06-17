@@ -534,7 +534,7 @@ async function generateImage(extraInstruction = '') {
     let optimizedPrompt = 'interior renovation, photorealistic, architectural photography, preserve original room structure and layout';
 
     if (japaneseInput && claudeKey) {
-      const convRes = await fetch('https://api.anthropic.com/v1/messages', {
+      const convRes = await fetch('https://replicate-proxy.h113-yuhta.workers.dev/anthropic/v1/messages', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
