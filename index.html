@@ -243,6 +243,7 @@
     <div id="rotateControls" class="rotate-controls" style="display:none;">
       <button class="rotate-btn" onclick="rotatePhoto(-90)">↺ 左90°</button>
       <button class="rotate-btn" onclick="rotatePhoto(90)">↻ 右90°</button>
+      <button class="rotate-btn" onclick="retakePhoto()" style="color:var(--c-danger);">🔄 取り直し</button>
     </div>
     <div style="flex:1"></div>
     <button class="btn btn-primary" id="step1Next" onclick="goTo(2)" disabled>この写真で続ける →</button>
@@ -285,7 +286,7 @@
     <div class="compare-grid">
       <div class="compare-item">
         <div class="compare-label">現状</div>
-        <img id="beforeImg" class="compare-img" />
+        <img id="beforeImg" class="compare-img" style="cursor:pointer;" onclick="openViewer(this.src)" />
       </div>
       <div class="compare-item">
         <div class="compare-label">生成後</div>
@@ -509,7 +510,18 @@ async function handlePhoto(e) {
   }
 }
 
-// ===== ROTATE PHOTO =====
+function retakePhoto() {
+  state.photoDataUrl = null;
+  state.photoBase64 = null;
+  currentRotation = 0;
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('photoUploadArea').style.display = 'block';
+  document.getElementById('rotateControls').style.display = 'none';
+  document.getElementById('step1Next').disabled = true;
+  document.getElementById('fileInput').value = '';
+}
+
+// ===== LOADING =====
 let currentRotation = 0;
 function rotatePhoto(deg) {
   currentRotation = (currentRotation + deg + 360) % 360;
@@ -895,10 +907,21 @@ function closeViewer() {
 
 function saveImage() {
   if (!state.generatedImageUrl) return;
-  const a = document.createElement('a');
-  a.href = state.generatedImageUrl;
-  a.download = `reform_${state.customerName}_${Date.now()}.png`;
-  a.click();
+  const ts = Date.now();
+  const name = state.customerName || 'reform';
+  // 現状写真を保存
+  const a1 = document.createElement('a');
+  a1.href = state.photoDataUrl;
+  a1.download = `${name}_現状_${ts}.jpg`;
+  a1.click();
+  // 少し間を置いて生成後を保存
+  setTimeout(() => {
+    const a2 = document.createElement('a');
+    a2.href = state.generatedImageUrl;
+    a2.download = `${name}_生成後_${ts}.jpg`;
+    a2.click();
+  }, 500);
+  showToast('現状・生成後の2枚を保存しました');
 }
 
 // ===== SKIP TO ANALYZE =====
