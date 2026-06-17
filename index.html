@@ -158,8 +158,8 @@
     <button class="modal-close" onclick="closeSettings()">×</button>
     <p class="modal-title">⚙ API設定</p>
     <div class="field">
-      <label>Stability AI APIキー（画像生成）</label>
-      <input type="password" id="stabilityKey" placeholder="sk-..." />
+      <label>Replicate APIトークン（画像生成）</label>
+      <input type="password" id="replicateKey" placeholder="r8_..." />
     </div>
     <div class="field mt-8">
       <label>Claude APIキー（項目分析）</label>
@@ -427,13 +427,13 @@ function selectStyle(value, url) {
 function openSettings() { document.getElementById('settingsModal').classList.add('active'); loadSettings(); }
 function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); }
 function loadSettings() {
-  document.getElementById('stabilityKey').value = localStorage.getItem('stabilityKey') || '';
+  document.getElementById('replicateKey').value = localStorage.getItem('replicateKey') || '';
   document.getElementById('claudeKey').value = localStorage.getItem('claudeKey') || '';
   document.getElementById('sheetsId').value = localStorage.getItem('sheetsId') || '';
   document.getElementById('sheetsKey').value = localStorage.getItem('sheetsKey') || '';
 }
 function saveSettings() {
-  localStorage.setItem('stabilityKey', document.getElementById('stabilityKey').value.trim());
+  localStorage.setItem('replicateKey', document.getElementById('replicateKey').value.trim());
   localStorage.setItem('claudeKey', document.getElementById('claudeKey').value.trim());
   localStorage.setItem('sheetsId', document.getElementById('sheetsId').value.trim());
   localStorage.setItem('sheetsKey', document.getElementById('sheetsKey').value.trim());
@@ -515,8 +515,8 @@ function showToast(msg) {
 }
 
 async function generateImage(extraInstruction = '') {
-  const stabilityKey = getKey('stabilityKey');
-  if (!stabilityKey) { openSettings(); return; }
+  const replicateKey = getKey('replicateKey');
+  if (!replicateKey) { openSettings(); return; }
   state.styleMemo = document.getElementById('styleMemo').value.trim();
   goTo(3);
   document.getElementById('beforeImg').src = state.photoDataUrl;
@@ -524,68 +524,72 @@ async function generateImage(extraInstruction = '') {
   document.getElementById('afterPlaceholder').style.display = 'flex';
   document.getElementById('step3ErrorBanner').style.display = 'none';
   document.getElementById('saveImgBtn').disabled = true;
+  document.getElementById('maskBtn').disabled = true;
 
-  showLoading('Stability AI で画像生成中...');
+  showLoading('スタイル変換中（約6秒）...');
   try {
-    const styleText = state.selectedStyle || 'modern';
-    const styleMap = {
-      'モダン':   { search: 'walls, floor, ceiling, fixtures', replace: 'modern interior renovation, white walls, light wood floor, recessed lighting, clean lines' },
-      'ナチュラル': { search: 'walls, floor, ceiling, fixtures', replace: 'natural interior renovation, warm wood tones, beige walls, soft lighting, organic materials' },
-      '和風':    { search: 'walls, floor, ceiling, fixtures', replace: 'japanese style interior renovation, shoji screens, tatami or wood floor, neutral tones, zen atmosphere' },
-      '北欧':    { search: 'walls, floor, ceiling, fixtures', replace: 'scandinavian interior renovation, white walls, light oak floor, minimalist design, cozy lighting' },
-      'シンプル':  { search: 'walls, floor, ceiling, fixtures', replace: 'simple minimal interior renovation, white walls, clean floor, minimal furniture, bright space' },
-      '高級感':   { search: 'walls, floor, ceiling, fixtures', replace: 'luxury interior renovation, marble or stone elements, premium materials, elegant lighting, high-end finishes' },
+    const prompt = [
+      'interior renovation, photorealistic, architectural photography',
+      state.styleMemo || '',
+      extraInstruction || ''
+    ].filter(Boolean).join(', ');
+
+    const input = {
+      content_image: state.photoDataUrl,
+      prompt,
+      negative_prompt: 'ugly, blurry, low quality, distorted, people, person',
+      style_strength: 0.6,
+      number_of_images: 1,
+      output_format: 'jpg'
     };
-    const style = styleMap[styleText] || styleMap['モダン'];
-    const replaceText = extraInstruction
-      ? style.replace + ', ' + extraInstruction
-      : style.replace;
+    if (state.styleRefUrl) input.style_image = state.styleRefUrl;
 
-    // 画像リサイズ（9MP以下に）
-    const resizedBase64 = await resizeImage(state.photoBase64, state.photoMimeType);
-
-    // base64→Blob変換
-    const byteString = atob(resizedBase64);
-    const ab = new ArrayBuffer(byteString.length);
-    const ia = new Uint8Array(ab);
-    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-    const blob = new Blob([ab], { type: state.photoMimeType });
-
-    const formData = new FormData();
-    formData.append('image', blob, 'photo.jpg');
-    formData.append('prompt', replaceText + (state.styleMemo ? ', ' + state.styleMemo : ''));
-    formData.append('search_prompt', style.search);
-    formData.append('negative_prompt', 'ugly, blurry, low quality, distorted, deformed, people, person, text, watermark');
-    formData.append('output_format', 'jpeg');
-
-    const res = await fetch('https://api.stability.ai/v2beta/stable-image/edit/search-and-replace', {
+    const res = await fetch('https://api.replicate.com/v1/models/fofr/style-transfer/predictions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${stabilityKey}`,
-        'Accept': 'image/*'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${replicateKey}`,
+        'Prefer': 'wait=30'
       },
-      body: formData
+      body: JSON.stringify({ input })
     });
 
-    if (!res.ok) {
-      const errText = await res.text();
-      throw new Error(errText || `HTTPエラー: ${res.status}`);
+    const prediction = await res.json();
+    if (prediction.error) throw new Error(prediction.error);
+
+    let result = prediction;
+    let attempts = 0;
+    while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < 20) {
+      await new Promise(r => setTimeout(r, 2000));
+      const poll = await fetch(`https://api.replicate.com/v1/predictions/${result.id}`, {
+        headers: { 'Authorization': `Bearer ${replicateKey}` }
+      });
+      result = await poll.json();
+      attempts++;
     }
 
-    const imgBlob = await res.blob();
-    const imgUrl = URL.createObjectURL(imgBlob);
-    state.generatedImageUrl = imgUrl;
+    if (result.status === 'failed') throw new Error(result.error || '生成に失敗しました');
+    const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+    if (!outputUrl) throw new Error('画像URLが取得できませんでした');
 
-    // base64変換（Claude分析用）
-    const reader = new FileReader();
-    reader.onload = e => { state.generatedImageBase64 = e.target.result.split(',')[1]; };
-    reader.readAsDataURL(imgBlob);
+    state.generatedImageUrl = outputUrl;
+    try {
+      const imgRes = await fetch(outputUrl);
+      const blob = await imgRes.blob();
+      const reader = new FileReader();
+      reader.onload = e => { state.generatedImageBase64 = e.target.result.split(',')[1]; };
+      reader.readAsDataURL(blob);
+    } catch(_) { state.generatedImageBase64 = null; }
 
-    document.getElementById('afterImg').src = imgUrl;
+    document.getElementById('afterImg').src = outputUrl;
     document.getElementById('afterImg').style.display = 'block';
     document.getElementById('afterPlaceholder').style.display = 'none';
     document.getElementById('saveImgBtn').disabled = false;
     document.getElementById('maskBtn').disabled = false;
+
+  } catch (err) {
+    const banner = document.getElementById('step3ErrorBanner');
+    banner.innerHTML = `<div class="error-banner">エラー：${err.message}<br><small>APIトークンを確認してください（⚙ボタン）</small></div>`;
     banner.style.display = 'block';
   } finally { hideLoading(); }
 }
