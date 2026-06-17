@@ -1,0 +1,921 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>リフォーム提案ツール</title>
+<style>
+  :root {
+    --c-bg: #f8f7f4;
+    --c-surface: #ffffff;
+    --c-border: #e8e5de;
+    --c-text: #1a1917;
+    --c-muted: #888780;
+    --c-accent: #185FA5;
+    --c-accent-bg: #E6F1FB;
+    --c-success: #3B6D11;
+    --c-success-bg: #EAF3DE;
+    --c-danger: #A32D2D;
+    --c-danger-bg: #FCEBEB;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, 'Hiragino Sans', sans-serif; background: var(--c-bg); color: var(--c-text); min-height: 100vh; overflow-x: hidden; }
+
+  /* ===== SCREENS ===== */
+  .screen { display: none; min-height: 100vh; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* ===== HEADER ===== */
+  .header { background: var(--c-surface); border-bottom: 0.5px solid var(--c-border); padding: 14px 16px 12px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 10; }
+  .header-back { width: 32px; height: 32px; border-radius: 50%; border: 0.5px solid var(--c-border); background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 18px; color: var(--c-muted); flex-shrink: 0; }
+  .header-title { font-size: 15px; font-weight: 600; flex: 1; }
+  .step-indicator { font-size: 11px; color: var(--c-muted); }
+
+  /* ===== PROGRESS ===== */
+  .progress-bar { height: 3px; background: var(--c-border); }
+  .progress-fill { height: 100%; background: var(--c-accent); transition: width 0.3s ease; }
+
+  /* ===== BODY ===== */
+  .screen-body { flex: 1; padding: 20px 16px; display: flex; flex-direction: column; gap: 16px; }
+
+  /* ===== FORM ELEMENTS ===== */
+  .field { display: flex; flex-direction: column; gap: 6px; }
+  .field label { font-size: 12px; font-weight: 500; color: var(--c-muted); }
+  .field input, .field textarea, .field select {
+    border: 0.5px solid var(--c-border); border-radius: var(--radius-sm);
+    padding: 10px 12px; font-size: 15px; font-family: inherit;
+    background: var(--c-surface); color: var(--c-text); outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field textarea:focus { border-color: var(--c-accent); }
+  .field textarea { resize: none; }
+
+  /* ===== CHIP GROUP ===== */
+  .chip-group { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { padding: 7px 14px; border-radius: 20px; border: 0.5px solid var(--c-border); font-size: 13px; cursor: pointer; background: var(--c-surface); color: var(--c-text); transition: all 0.15s; user-select: none; }
+  .chip.selected { background: var(--c-accent-bg); color: var(--c-accent); border-color: var(--c-accent); font-weight: 500; }
+
+  /* ===== BUTTONS ===== */
+  .btn { width: 100%; padding: 14px; border-radius: var(--radius); border: none; font-size: 15px; font-weight: 600; cursor: pointer; transition: opacity 0.15s, transform 0.1s; font-family: inherit; }
+  .btn:active { transform: scale(0.98); opacity: 0.85; }
+  .btn-primary { background: var(--c-accent); color: #fff; }
+  .btn-secondary { background: var(--c-surface); color: var(--c-text); border: 0.5px solid var(--c-border); font-weight: 500; }
+  .btn-success { background: var(--c-success); color: #fff; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ===== PHOTO AREA ===== */
+  .photo-upload-area {
+    border: 1.5px dashed var(--c-border); border-radius: var(--radius);
+    padding: 32px 16px; text-align: center; cursor: pointer;
+    background: var(--c-surface); transition: border-color 0.15s;
+  }
+  .photo-upload-area:active { border-color: var(--c-accent); }
+  .photo-upload-area .icon { font-size: 40px; margin-bottom: 8px; }
+  .photo-upload-area p { font-size: 14px; color: var(--c-muted); }
+  .photo-preview { width: 100%; border-radius: var(--radius); object-fit: contain; max-height: 400px; display: block; background: var(--c-bg); }
+  #fileInput { display: none; }
+
+  /* ===== COMPARE ===== */
+  .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .compare-item { display: flex; flex-direction: column; gap: 6px; }
+  .compare-label { font-size: 11px; font-weight: 500; color: var(--c-muted); text-align: center; }
+  .compare-img { width: 100%; border-radius: var(--radius-sm); object-fit: cover; aspect-ratio: 4/3; background: var(--c-border); display: block; }
+  .compare-placeholder { width: 100%; aspect-ratio: 4/3; border-radius: var(--radius-sm); background: var(--c-accent-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  .compare-placeholder span { font-size: 11px; color: var(--c-accent); }
+
+  /* ===== ITEM LIST ===== */
+  .item-list { display: flex; flex-direction: column; gap: 0; border: 0.5px solid var(--c-border); border-radius: var(--radius); overflow: hidden; background: var(--c-surface); }
+  .item-row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-bottom: 0.5px solid var(--c-border); }
+  .item-row:last-child { border-bottom: none; }
+  .item-num { width: 22px; height: 22px; border-radius: 50%; background: var(--c-accent-bg); color: var(--c-accent); font-size: 11px; font-weight: 600; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .item-text { flex: 1; font-size: 14px; }
+  .item-del { width: 28px; height: 28px; border-radius: 50%; border: none; background: transparent; color: var(--c-muted); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+  .add-item-row { display: flex; gap: 8px; }
+  .add-item-input { flex: 1; border: 0.5px solid var(--c-border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 14px; font-family: inherit; outline: none; background: var(--c-surface); }
+  .add-item-btn { padding: 10px 16px; border-radius: var(--radius-sm); border: none; background: var(--c-accent-bg); color: var(--c-accent); font-size: 14px; font-weight: 600; cursor: pointer; }
+
+  /* ===== SUMMARY CARD ===== */
+  .summary-card { background: var(--c-surface); border: 0.5px solid var(--c-border); border-radius: var(--radius); padding: 16px; }
+  .summary-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 13px; }
+  .summary-row .label { color: var(--c-muted); }
+  .summary-row .value { font-weight: 500; }
+  .tag { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 20px; background: var(--c-accent-bg); color: var(--c-accent); font-weight: 500; }
+
+  /* ===== LOADING ===== */
+  .loading-overlay { display: none; position: fixed; inset: 0; background: rgba(255,255,255,0.92); z-index: 100; flex-direction: column; align-items: center; justify-content: center; gap: 16px; }
+  .loading-overlay.active { display: flex; }
+  .spinner { width: 40px; height: 40px; border: 3px solid var(--c-border); border-top-color: var(--c-accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loading-text { font-size: 14px; color: var(--c-muted); }
+
+  /* ===== INFO BANNER ===== */
+  .info-banner { background: var(--c-accent-bg); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--c-accent); }
+  .success-banner { background: var(--c-success-bg); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 13px; color: var(--c-success); font-weight: 500; }
+  .error-banner { background: var(--c-danger-bg); border-radius: var(--radius-sm); padding: 10px 14px; font-size: 12px; color: var(--c-danger); }
+
+  /* ===== SETTINGS ===== */
+  .settings-btn { position: fixed; top: 14px; right: 16px; z-index: 20; width: 32px; height: 32px; border-radius: 50%; border: 0.5px solid var(--c-border); background: var(--c-surface); cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center; color: var(--c-muted); }
+  .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 200; align-items: flex-end; }
+  .modal.active { display: flex; }
+  .modal-content { background: var(--c-surface); border-radius: 20px 20px 0 0; padding: 24px 16px 40px; width: 100%; }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 16px; }
+  .modal-close { float: right; font-size: 22px; color: var(--c-muted); cursor: pointer; background: none; border: none; }
+
+  /* ===== STYLE THUMBNAILS ===== */
+  .style-thumb-item { border-radius: var(--radius-sm); overflow: hidden; border: 2px solid transparent; cursor: pointer; position: relative; transition: border-color 0.15s; }
+  .style-thumb-item img { width: 100%; aspect-ratio: 4/3; object-fit: cover; display: block; }
+  .style-thumb-item span { display: block; text-align: center; font-size: 12px; font-weight: 500; padding: 5px 4px; background: var(--c-surface); color: var(--c-text); }
+  .style-thumb-item.selected { border-color: var(--c-accent); }
+  .style-thumb-item.selected span { background: var(--c-accent-bg); color: var(--c-accent); }
+  .style-thumb-item.selected::after { content: '✓'; position: absolute; top: 6px; right: 6px; width: 20px; height: 20px; background: var(--c-accent); color: #fff; border-radius: 50%; font-size: 11px; display: flex; align-items: center; justify-content: center; font-weight: 700; line-height: 20px; text-align: center; }
+
+
+  .mt-4 { margin-top: 4px; }
+  .mt-8 { margin-top: 8px; }
+  .gap-8 { display: flex; flex-direction: column; gap: 8px; }
+  .row { display: flex; gap: 10px; }
+  .row .btn { flex: 1; }
+  .divider { height: 0.5px; background: var(--c-border); }
+</style>
+</head>
+<body>
+
+<!-- ローディング -->
+<div class="loading-overlay" id="loadingOverlay">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">処理中...</div>
+</div>
+
+<!-- 全画面画像ビューワー -->
+<div id="imgViewer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:500; align-items:center; justify-content:center;" onclick="closeViewer()">
+  <img id="imgViewerImg" style="max-width:100%; max-height:100%; object-fit:contain;" />
+  <div style="position:absolute; top:16px; right:16px; color:#fff; font-size:28px; cursor:pointer;">×</div>
+</div>
+<div class="modal" id="settingsModal">
+  <div class="modal-content">
+    <button class="modal-close" onclick="closeSettings()">×</button>
+    <p class="modal-title">⚙ API設定</p>
+    <div class="field">
+      <label>Stability AI APIキー（画像生成）</label>
+      <input type="password" id="stabilityKey" placeholder="sk-..." />
+    </div>
+    <div class="field mt-8">
+      <label>Claude APIキー（項目分析）</label>
+      <input type="password" id="claudeKey" placeholder="sk-ant-..." />
+    </div>
+    <div class="field mt-8">
+      <label>Google Sheets スプレッドシートID（任意）</label>
+      <input type="text" id="sheetsId" placeholder="未設定でもOK" />
+    </div>
+    <div class="field mt-8">
+      <label>Google Sheets APIキー（任意）</label>
+      <input type="password" id="sheetsKey" placeholder="未設定でもOK" />
+    </div>
+    <button class="btn btn-primary mt-8" onclick="saveSettings()">保存</button>
+    <div class="info-banner mt-8">キーはこの端末のみに保存されます。GitHubには含まれません。</div>
+  </div>
+</div>
+
+<!-- 設定ボタン（全画面共通） -->
+<button class="settings-btn" onclick="openSettings()">⚙</button>
+
+<!-- ===== STEP 0: 物件情報 ===== -->
+<div class="screen active" id="screen0">
+  <div class="header">
+    <div class="header-title">リフォーム提案ツール</div>
+    <span class="step-indicator">0 / 5</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div>
+  <div class="screen-body">
+    <div class="info-banner">現地訪問前または訪問時に入力してください</div>
+    <div class="field">
+      <label>顧客名 *</label>
+      <input type="text" id="customerName" placeholder="田中 一郎" />
+    </div>
+    <div class="field">
+      <label>物件住所 *</label>
+      <input type="text" id="address" placeholder="岐阜県○○市○○町1-2-3" />
+    </div>
+    <div class="field">
+      <label>工事種別</label>
+      <div class="chip-group" id="workTypeGroup">
+        <div class="chip selected" data-value="リフォーム">リフォーム</div>
+        <div class="chip" data-value="新築">新築</div>
+        <div class="chip" data-value="修繕">修繕</div>
+        <div class="chip" data-value="増改築">増改築</div>
+      </div>
+    </div>
+    <div class="field">
+      <label>担当者</label>
+      <input type="text" id="staffName" placeholder="原 ○○" />
+    </div>
+    <div class="field">
+      <label>メモ（任意）</label>
+      <textarea id="memo0" rows="2" placeholder="初回訪問・LDK全体を検討中"></textarea>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="goToStep1()">写真撮影へ →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 1: 写真撮影 ===== -->
+<div class="screen" id="screen1">
+  <div class="header">
+    <button class="header-back" onclick="goTo(0)">‹</button>
+    <div class="header-title">現場写真</div>
+    <span class="step-indicator">1 / 5</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:20%"></div></div>
+  <div class="screen-body">
+    <div class="summary-card" id="step1Summary"></div>
+    <input type="file" id="fileInput" accept="image/*" onchange="handlePhoto(event)" />
+    <div class="photo-upload-area" id="photoUploadArea" onclick="document.getElementById('fileInput').click()">
+      <div class="icon">📷</div>
+      <p>タップして撮影 / アルバムから選択</p>
+    </div>
+    <img id="photoPreview" class="photo-preview" style="display:none" />
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" id="step1Next" onclick="goTo(2)" disabled>この写真で続ける →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 2: スタイル選択 ===== -->
+<div class="screen" id="screen2">
+  <div class="header">
+    <button class="header-back" onclick="goTo(1)">‹</button>
+    <div class="header-title">雰囲気を選ぶ</div>
+    <span class="step-indicator">2 / 5</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:40%"></div></div>
+  <div class="screen-body">
+    <img id="step2Thumb" class="photo-preview" />
+    <div class="field">
+      <label>仕上がりイメージを選択</label>
+      <div id="styleThumbnails" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
+    </div>
+    <div class="field">
+      <label>追加指示（任意）</label>
+      <textarea id="styleMemo" rows="2" placeholder="例：白系の壁にしたい、床は明るい木目で"></textarea>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" id="step2Next" onclick="generateImage()" disabled>イメージを生成する →</button>
+    <button class="btn btn-secondary" style="margin-top:8px;" onclick="skipToAnalyze()">画像生成をスキップして項目分析へ →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 3: 画像生成結果 ===== -->
+<div class="screen" id="screen3">
+  <div class="header">
+    <button class="header-back" onclick="goTo(2)">‹</button>
+    <div class="header-title">リフォームイメージ</div>
+    <span class="step-indicator">3 / 5</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:60%"></div></div>
+  <div class="screen-body">
+    <div class="compare-grid">
+      <div class="compare-item">
+        <div class="compare-label">現状</div>
+        <img id="beforeImg" class="compare-img" />
+      </div>
+      <div class="compare-item">
+        <div class="compare-label">生成後</div>
+        <img id="afterImg" class="compare-img" style="display:none; cursor:pointer;" onclick="openViewer(this.src)" />
+        <div class="compare-placeholder" id="afterPlaceholder">
+          <span style="font-size:28px">✨</span>
+          <span>生成待機中</span>
+        </div>
+      </div>
+    </div>
+    <div id="step3ErrorBanner" style="display:none"></div>
+
+    <!-- マスク塗りエリア -->
+    <div id="maskArea" style="display:none; flex-direction:column; gap:8px; border:0.5px solid var(--c-border); border-radius:var(--radius); padding:12px; background:var(--c-bg);">
+      <div style="font-size:12px; font-weight:500; color:var(--c-muted);">✏️ 変更したい部分を指で塗ってください</div>
+      <div style="position:relative; width:100%; border-radius:var(--radius-sm); overflow:hidden;">
+        <img id="maskBaseImg" style="width:100%; display:block;" />
+        <canvas id="maskCanvas" style="position:absolute; top:0; left:0; width:100%; height:100%; touch-action:none; cursor:crosshair;"></canvas>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <label style="font-size:11px; color:var(--c-muted);">ブラシサイズ</label>
+        <input type="range" id="brushSize" min="10" max="80" value="30" style="flex:1;" />
+        <button onclick="clearMask()" style="padding:6px 12px; border-radius:var(--radius-sm); border:0.5px solid var(--c-border); background:var(--c-surface); font-size:12px; cursor:pointer;">クリア</button>
+      </div>
+      <input type="text" id="maskInstruction" placeholder="例：天井を羽目板に変更" style="border:0.5px solid var(--c-border); border-radius:var(--radius-sm); padding:9px 12px; font-size:13px; font-family:inherit; outline:none; background:var(--c-surface);" />
+      <div style="display:flex; gap:8px;">
+        <button onclick="cancelMask()" style="flex:1; padding:10px; border-radius:var(--radius-sm); border:0.5px solid var(--c-border); background:var(--c-surface); font-size:13px; cursor:pointer;">キャンセル</button>
+        <button onclick="applyMask()" style="flex:1; padding:10px; border-radius:var(--radius-sm); border:none; background:var(--c-accent); color:#fff; font-size:13px; font-weight:600; cursor:pointer;">この部分を変更</button>
+      </div>
+    </div>
+
+    <!-- 通常操作エリア -->
+    <div id="normalArea" style="display:flex; flex-direction:column; gap:8px; border:0.5px solid var(--c-border); border-radius:var(--radius); padding:12px; background:var(--c-bg);">
+      <div style="font-size:12px; font-weight:500; color:var(--c-muted);">イメージが違う場合は再生成</div>
+      <div style="display:flex; gap:8px;">
+        <input type="text" id="retryInstruction" placeholder="例：全体をモダンに"
+          style="flex:1; border:0.5px solid var(--c-border); border-radius:var(--radius-sm); padding:9px 12px; font-size:13px; font-family:inherit; outline:none; background:var(--c-surface);" />
+        <button onclick="retryGenerate()" style="padding:9px 14px; border-radius:var(--radius-sm); border:none; background:var(--c-accent); color:#fff; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap;">再生成</button>
+      </div>
+      <button id="maskBtn" onclick="startMask()" disabled style="padding:9px; border-radius:var(--radius-sm); border:0.5px solid var(--c-accent); background:var(--c-accent-bg); color:var(--c-accent); font-size:13px; font-weight:600; cursor:pointer;">✏️ 部分指定して変更（マスク塗り）</button>
+    </div>
+
+    <div class="row">
+      <button class="btn btn-secondary" id="saveImgBtn" onclick="saveImage()" disabled>💾 保存</button>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="analyzeItems()">リフォーム項目を分析する →</button>
+    <button class="btn btn-secondary" style="margin-top:8px;" onclick="skipToAnalyze()">画像なしで項目分析へ →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 4: 項目リスト ===== -->
+<div class="screen" id="screen4">
+  <div class="header">
+    <button class="header-back" onclick="goTo(3)">‹</button>
+    <div class="header-title">リフォーム項目</div>
+    <span class="step-indicator">4 / 5</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:80%"></div></div>
+  <div class="screen-body">
+    <div class="info-banner" id="step4Info">Claude が画像を分析して項目を自動生成します</div>
+    <div class="item-list" id="itemList"></div>
+    <div class="add-item-row">
+      <input type="text" class="add-item-input" id="newItemInput" placeholder="項目を追加..." />
+      <button class="add-item-btn" onclick="addItem()">追加</button>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn btn-primary" onclick="goTo(5)">見積書を出力する →</button>
+  </div>
+</div>
+
+<!-- ===== STEP 5: 出力 ===== -->
+<div class="screen" id="screen5">
+  <div class="header">
+    <button class="header-back" onclick="goTo(4)">‹</button>
+    <div class="header-title">概算見積書を出力</div>
+    <span class="step-indicator">5 / 5</span>
+  </div>
+  <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+  <div class="screen-body">
+    <div class="summary-card" id="step5Summary"></div>
+    <div class="divider"></div>
+    <div class="field">
+      <label>リフォーム項目（確認）</label>
+      <div class="item-list" id="step5ItemList"></div>
+    </div>
+    <div id="step5Result"></div>
+    <div style="flex:1"></div>
+    <div class="gap-8">
+      <button class="btn btn-success" onclick="exportToSheets()">📊 Googleスプレッドシートに出力</button>
+      <button class="btn btn-secondary" onclick="shareData()">📤 テキストで共有</button>
+      <button class="btn btn-secondary" onclick="newCase()">＋ 新規案件を始める</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+const state = {
+  customerName: '', address: '', workType: 'リフォーム', staffName: '', memo: '',
+  photoDataUrl: null, photoBase64: null, photoMimeType: null,
+  selectedStyle: null, styleRefUrl: null, styleRefBase64: null, styleMemo: '',
+  generatedImageUrl: null, generatedImageBase64: null,
+  items: []
+};
+
+// ===== STYLE DATA =====
+// ※ Googleフォトに差し替える場合はurlを更新するだけでOK
+const STYLES = [
+  { value: 'モダン',    label: 'モダン',    url: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?w=400&q=80' },
+  { value: 'ナチュラル', label: 'ナチュラル', url: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=400&q=80' },
+  { value: '和風',     label: '和風',     url: 'https://images.unsplash.com/photo-1480796927426-f609979314bd?w=400&q=80' },
+  { value: '北欧',     label: '北欧',     url: 'https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=400&q=80' },
+  { value: 'シンプル',  label: 'シンプル',  url: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?w=400&q=80' },
+  { value: '高級感',   label: '高級感',   url: 'https://images.unsplash.com/photo-1600210492493-0946911123ea?w=400&q=80' },
+];
+
+function renderStyleThumbnails() {
+  const container = document.getElementById('styleThumbnails');
+  container.innerHTML = STYLES.map(s => `
+    <div class="style-thumb-item" id="sthumb-${s.value}" onclick="selectStyle('${s.value}','${s.url}')">
+      <img src="${s.url}" alt="${s.label}" onerror="this.style.background='var(--c-border)'" />
+      <span>${s.label}</span>
+    </div>
+  `).join('');
+}
+
+function selectStyle(value, url) {
+  // 選択状態を更新
+  document.querySelectorAll('.style-thumb-item').forEach(el => el.classList.remove('selected'));
+  document.getElementById('sthumb-' + value).classList.add('selected');
+  state.selectedStyle = value;
+  state.styleRefUrl = url;
+  // 画像をbase64に変換（API送信用）
+  fetch(url)
+    .then(r => r.blob())
+    .then(blob => {
+      const reader = new FileReader();
+      reader.onload = e => { state.styleRefBase64 = e.target.result.split(',')[1]; };
+      reader.readAsDataURL(blob);
+    })
+    .catch(() => { state.styleRefBase64 = null; });
+  document.getElementById('step2Next').disabled = false;
+}
+
+// ===== SETTINGS =====
+function openSettings() { document.getElementById('settingsModal').classList.add('active'); loadSettings(); }
+function closeSettings() { document.getElementById('settingsModal').classList.remove('active'); }
+function loadSettings() {
+  document.getElementById('stabilityKey').value = localStorage.getItem('stabilityKey') || '';
+  document.getElementById('claudeKey').value = localStorage.getItem('claudeKey') || '';
+  document.getElementById('sheetsId').value = localStorage.getItem('sheetsId') || '';
+  document.getElementById('sheetsKey').value = localStorage.getItem('sheetsKey') || '';
+}
+function saveSettings() {
+  localStorage.setItem('stabilityKey', document.getElementById('stabilityKey').value.trim());
+  localStorage.setItem('claudeKey', document.getElementById('claudeKey').value.trim());
+  localStorage.setItem('sheetsId', document.getElementById('sheetsId').value.trim());
+  localStorage.setItem('sheetsKey', document.getElementById('sheetsKey').value.trim());
+  closeSettings();
+  showToast('設定を保存しました');
+}
+function getKey(name) { return localStorage.getItem(name) || ''; }
+
+// ===== NAVIGATION =====
+function goTo(n) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen' + n).classList.add('active');
+  window.scrollTo(0, 0);
+}
+
+function goToStep1() {
+  const name = document.getElementById('customerName').value.trim();
+  const addr = document.getElementById('address').value.trim();
+  if (!name || !addr) { alert('顧客名と住所は必須です'); return; }
+  state.customerName = name;
+  state.address = addr;
+  state.workType = document.querySelector('#workTypeGroup .chip.selected')?.dataset.value || 'リフォーム';
+  state.staffName = document.getElementById('staffName').value.trim();
+  state.memo = document.getElementById('memo0').value.trim();
+  // サマリー表示
+  document.getElementById('step1Summary').innerHTML =
+    `<div class="summary-row"><span class="label">顧客名</span><span class="value">${state.customerName} 様</span></div>
+     <div class="summary-row"><span class="label">住所</span><span class="value" style="font-size:12px">${state.address}</span></div>
+     <div class="summary-row"><span class="label">種別</span><span class="value"><span class="tag">${state.workType}</span></span></div>
+     ${state.staffName ? `<div class="summary-row"><span class="label">担当</span><span class="value">${state.staffName}</span></div>` : ''}`;
+  goTo(1);
+}
+
+// ===== CHIP TOGGLE (single) =====
+document.querySelectorAll('#workTypeGroup .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#workTypeGroup .chip').forEach(c => c.classList.remove('selected'));
+    chip.classList.add('selected');
+  });
+});
+
+// ===== STYLE THUMBNAILS INIT =====
+renderStyleThumbnails();
+
+// ===== PHOTO =====
+function handlePhoto(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  state.photoMimeType = file.type;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    state.photoDataUrl = ev.target.result;
+    state.photoBase64 = ev.target.result.split(',')[1];
+    document.getElementById('photoPreview').src = ev.target.result;
+    document.getElementById('photoPreview').style.display = 'block';
+    document.getElementById('photoUploadArea').style.display = 'none';
+    document.getElementById('step1Next').disabled = false;
+    document.getElementById('step2Thumb').src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ===== LOADING =====
+function showLoading(text) {
+  document.getElementById('loadingText').textContent = text || '処理中...';
+  document.getElementById('loadingOverlay').classList.add('active');
+}
+function hideLoading() { document.getElementById('loadingOverlay').classList.remove('active'); }
+
+// ===== TOAST =====
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.textContent = msg;
+  Object.assign(t.style, { position:'fixed', bottom:'80px', left:'50%', transform:'translateX(-50%)',
+    background:'#1a1917', color:'#fff', padding:'10px 20px', borderRadius:'20px',
+    fontSize:'13px', zIndex:'300', whiteSpace:'nowrap' });
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 2500);
+}
+
+async function generateImage(extraInstruction = '') {
+  const stabilityKey = getKey('stabilityKey');
+  if (!stabilityKey) { openSettings(); return; }
+  state.styleMemo = document.getElementById('styleMemo').value.trim();
+  goTo(3);
+  document.getElementById('beforeImg').src = state.photoDataUrl;
+  document.getElementById('afterImg').style.display = 'none';
+  document.getElementById('afterPlaceholder').style.display = 'flex';
+  document.getElementById('step3ErrorBanner').style.display = 'none';
+  document.getElementById('saveImgBtn').disabled = true;
+
+  showLoading('Stability AI で画像生成中...');
+  try {
+    const styleText = state.selectedStyle || 'modern';
+    const styleMap = {
+      'モダン':   { search: 'walls, floor, ceiling, fixtures', replace: 'modern interior renovation, white walls, light wood floor, recessed lighting, clean lines' },
+      'ナチュラル': { search: 'walls, floor, ceiling, fixtures', replace: 'natural interior renovation, warm wood tones, beige walls, soft lighting, organic materials' },
+      '和風':    { search: 'walls, floor, ceiling, fixtures', replace: 'japanese style interior renovation, shoji screens, tatami or wood floor, neutral tones, zen atmosphere' },
+      '北欧':    { search: 'walls, floor, ceiling, fixtures', replace: 'scandinavian interior renovation, white walls, light oak floor, minimalist design, cozy lighting' },
+      'シンプル':  { search: 'walls, floor, ceiling, fixtures', replace: 'simple minimal interior renovation, white walls, clean floor, minimal furniture, bright space' },
+      '高級感':   { search: 'walls, floor, ceiling, fixtures', replace: 'luxury interior renovation, marble or stone elements, premium materials, elegant lighting, high-end finishes' },
+    };
+    const style = styleMap[styleText] || styleMap['モダン'];
+    const replaceText = extraInstruction
+      ? style.replace + ', ' + extraInstruction
+      : style.replace;
+
+    // 画像リサイズ（9MP以下に）
+    const resizedBase64 = await resizeImage(state.photoBase64, state.photoMimeType);
+
+    // base64→Blob変換
+    const byteString = atob(resizedBase64);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+    const blob = new Blob([ab], { type: state.photoMimeType });
+
+    const formData = new FormData();
+    formData.append('image', blob, 'photo.jpg');
+    formData.append('prompt', replaceText + (state.styleMemo ? ', ' + state.styleMemo : ''));
+    formData.append('search_prompt', style.search);
+    formData.append('negative_prompt', 'ugly, blurry, low quality, distorted, deformed, people, person, text, watermark');
+    formData.append('output_format', 'jpeg');
+
+    const res = await fetch('https://api.stability.ai/v2beta/stable-image/edit/search-and-replace', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${stabilityKey}`,
+        'Accept': 'image/*'
+      },
+      body: formData
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(errText || `HTTPエラー: ${res.status}`);
+    }
+
+    const imgBlob = await res.blob();
+    const imgUrl = URL.createObjectURL(imgBlob);
+    state.generatedImageUrl = imgUrl;
+
+    // base64変換（Claude分析用）
+    const reader = new FileReader();
+    reader.onload = e => { state.generatedImageBase64 = e.target.result.split(',')[1]; };
+    reader.readAsDataURL(imgBlob);
+
+    document.getElementById('afterImg').src = imgUrl;
+    document.getElementById('afterImg').style.display = 'block';
+    document.getElementById('afterPlaceholder').style.display = 'none';
+    document.getElementById('saveImgBtn').disabled = false;
+    document.getElementById('maskBtn').disabled = false;
+    banner.style.display = 'block';
+  } finally { hideLoading(); }
+}
+
+function retryGenerate() {
+  const instruction = document.getElementById('retryInstruction').value.trim();
+  generateImage(instruction);
+}
+
+// ===== IMAGE RESIZE =====
+function resizeImage(base64, mimeType, maxPixels = 9000000) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      const pixels = width * height;
+      if (pixels <= maxPixels) { resolve(base64); return; }
+      const ratio = Math.sqrt(maxPixels / pixels);
+      width = Math.floor(width * ratio);
+      height = Math.floor(height * ratio);
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL(mimeType, 0.9).split(',')[1]);
+    };
+    img.src = `data:${mimeType};base64,${base64}`;
+  });
+}
+
+
+
+
+// ===== MASK PAINTING =====
+let maskDrawing = false;
+
+function startMask() {
+  const img = document.getElementById('afterImg');
+  document.getElementById('maskBaseImg').src = img.src;
+  document.getElementById('maskArea').style.display = 'flex';
+  document.getElementById('normalArea').style.display = 'none';
+  setTimeout(initMaskCanvas, 100);
+}
+
+function cancelMask() {
+  document.getElementById('maskArea').style.display = 'none';
+  document.getElementById('normalArea').style.display = 'flex';
+  clearMask();
+}
+
+function initMaskCanvas() {
+  const canvas = document.getElementById('maskCanvas');
+  const img = document.getElementById('maskBaseImg');
+  canvas.width = img.naturalWidth || img.offsetWidth;
+  canvas.height = img.naturalHeight || img.offsetHeight;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  const draw = (x, y) => {
+    const size = parseInt(document.getElementById('brushSize').value);
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    ctx.fillStyle = 'rgba(255,50,50,0.55)';
+    ctx.beginPath();
+    ctx.arc((x - rect.left) * scaleX, (y - rect.top) * scaleY, size * scaleX, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  canvas.addEventListener('mousedown', e => { maskDrawing = true; draw(e.clientX, e.clientY); });
+  canvas.addEventListener('mousemove', e => { if (maskDrawing) draw(e.clientX, e.clientY); });
+  canvas.addEventListener('mouseup', () => { maskDrawing = false; });
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); maskDrawing = true; draw(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  canvas.addEventListener('touchmove', e => { e.preventDefault(); if (maskDrawing) draw(e.touches[0].clientX, e.touches[0].clientY); }, { passive: false });
+  canvas.addEventListener('touchend', () => { maskDrawing = false; });
+}
+
+function clearMask() {
+  const canvas = document.getElementById('maskCanvas');
+  if (!canvas) return;
+  canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+}
+
+async function applyMask() {
+  const stabilityKey = getKey('stabilityKey');
+  if (!stabilityKey) { openSettings(); return; }
+  const instruction = document.getElementById('maskInstruction').value.trim();
+  if (!instruction) { alert('変更内容を入力してください'); return; }
+
+  // マスク画像生成（白=変更する、黒=変更しない）
+  const canvas = document.getElementById('maskCanvas');
+  const maskCanvas = document.createElement('canvas');
+  maskCanvas.width = canvas.width;
+  maskCanvas.height = canvas.height;
+  const mCtx = maskCanvas.getContext('2d');
+  mCtx.fillStyle = 'black';
+  mCtx.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+  const srcData = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height);
+  for (let i = 0; i < srcData.data.length; i += 4) {
+    if (srcData.data[i + 3] > 10) {
+      mCtx.fillStyle = 'white';
+      mCtx.fillRect((i / 4) % canvas.width, Math.floor((i / 4) / canvas.width), 1, 1);
+    }
+  }
+
+  cancelMask();
+  showLoading('マスク部分を変更中...');
+
+  try {
+    const resizedBase64 = await resizeImage(state.photoBase64, state.photoMimeType);
+    const toBlob = (b64, mime) => {
+      const bs = atob(b64); const ab = new ArrayBuffer(bs.length); const ia = new Uint8Array(ab);
+      for (let i = 0; i < bs.length; i++) ia[i] = bs.charCodeAt(i);
+      return new Blob([ab], { type: mime });
+    };
+    const imgBlob = toBlob(resizedBase64, state.photoMimeType);
+    const maskBlob = toBlob(maskCanvas.toDataURL('image/png').split(',')[1], 'image/png');
+
+    const formData = new FormData();
+    formData.append('image', imgBlob, 'photo.jpg');
+    formData.append('mask', maskBlob, 'mask.png');
+    formData.append('prompt', instruction + ', high quality, photorealistic, architectural photography');
+    formData.append('negative_prompt', 'ugly, blurry, low quality, distorted');
+    formData.append('output_format', 'jpeg');
+
+    const res = await fetch('https://api.stability.ai/v2beta/stable-image/edit/inpaint', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${stabilityKey}`, 'Accept': 'image/*' },
+      body: formData
+    });
+
+    if (!res.ok) throw new Error(await res.text() || `HTTPエラー: ${res.status}`);
+
+    const resultBlob = await res.blob();
+    const resultUrl = URL.createObjectURL(resultBlob);
+    state.generatedImageUrl = resultUrl;
+    const reader = new FileReader();
+    reader.onload = e => { state.generatedImageBase64 = e.target.result.split(',')[1]; };
+    reader.readAsDataURL(resultBlob);
+    document.getElementById('afterImg').src = resultUrl;
+    document.getElementById('afterImg').style.display = 'block';
+    document.getElementById('afterPlaceholder').style.display = 'none';
+    document.getElementById('saveImgBtn').disabled = false;
+    document.getElementById('maskBtn').disabled = false;
+    showToast('マスク部分を変更しました');
+
+  } catch (err) {
+    const banner = document.getElementById('step3ErrorBanner');
+    banner.innerHTML = `<div class="error-banner">エラー：${err.message}</div>`;
+    banner.style.display = 'block';
+  } finally { hideLoading(); }
+}
+
+function openViewer(src) {
+  document.getElementById('imgViewerImg').src = src;
+  const v = document.getElementById('imgViewer');
+  v.style.display = 'flex';
+}
+function closeViewer() {
+  document.getElementById('imgViewer').style.display = 'none';
+}
+
+
+function saveImage() {
+  if (!state.generatedImageUrl) return;
+  const a = document.createElement('a');
+  a.href = state.generatedImageUrl;
+  a.download = `reform_${state.customerName}_${Date.now()}.png`;
+  a.click();
+}
+
+// ===== SKIP TO ANALYZE =====
+function skipToAnalyze() {
+  state.generatedImageBase64 = null;
+  state.generatedImageUrl = null;
+  analyzeItems();
+}
+
+// ===== CLAUDE ANALYZE =====
+async function analyzeItems() {
+  const claudeKey = getKey('claudeKey');
+  if (!claudeKey) { openSettings(); return; }
+  goTo(4);
+  document.getElementById('itemList').innerHTML = '';
+  state.items = [];
+  showLoading('Claude がリフォーム項目を分析中...');
+  try {
+    const styleText = state.selectedStyle || '指定なし';
+    const prompt = `以下の情報を元に、必要なリフォーム工事項目を箇条書きで10〜15項目程度出力してください。各項目は「工事内容（箇所）」の形式で、簡潔に記載してください。
+スタイル：${styleText}
+追加要望：${state.styleMemo || 'なし'}
+工事種別：${state.workType}
+メモ：${state.memo || 'なし'}
+現場写真を参考に、現実的なリフォーム項目を挙げてください。
+JSON配列のみで返してください（説明文不要）。例：["壁クロス張り替え（LDK）","フローリング重ね張り","照明器具交換（シーリング）"]`;
+
+    // 写真あり・なしで分岐
+    let content = [];
+    if (state.photoBase64) {
+      content.push({ type: 'image', source: { type: 'base64', media_type: state.photoMimeType, data: state.photoBase64 } });
+    }
+    if (state.generatedImageBase64) {
+      content.push({ type: 'image', source: { type: 'base64', media_type: 'image/png', data: state.generatedImageBase64 } });
+    }
+    content.push({ type: 'text', text: prompt });
+
+    const messages = [{ role: 'user', content }];
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': claudeKey, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({ model: 'claude-sonnet-4-20250514', max_tokens: 1000, messages })
+    });
+    const data = await res.json();
+    const text = data.content?.[0]?.text || '[]';
+    const clean = text.replace(/```json|```/g, '').trim();
+    const items = JSON.parse(clean);
+    state.items = items;
+    renderItems();
+    document.getElementById('step4Info').textContent = `${items.length}件の項目を生成しました（編集・追加可）`;
+  } catch (err) {
+    document.getElementById('step4Info').innerHTML = `<span style="color:var(--c-danger)">エラー：${err.message}。手動で項目を追加してください。</span>`;
+  } finally { hideLoading(); }
+}
+
+function renderItems() {
+  const list = document.getElementById('itemList');
+  list.innerHTML = state.items.map((item, i) =>
+    `<div class="item-row">
+      <div class="item-num">${i + 1}</div>
+      <div class="item-text">${item}</div>
+      <button class="item-del" onclick="deleteItem(${i})">×</button>
+    </div>`
+  ).join('');
+}
+
+function deleteItem(i) { state.items.splice(i, 1); renderItems(); }
+function addItem() {
+  const input = document.getElementById('newItemInput');
+  const val = input.value.trim();
+  if (!val) return;
+  state.items.push(val);
+  renderItems();
+  input.value = '';
+}
+
+// ===== STEP 5 SUMMARY =====
+function goTo5() {
+  const date = new Date().toLocaleDateString('ja-JP');
+  document.getElementById('step5Summary').innerHTML =
+    `<div class="summary-row"><span class="label">顧客名</span><span class="value">${state.customerName} 様</span></div>
+     <div class="summary-row"><span class="label">住所</span><span class="value" style="font-size:12px">${state.address}</span></div>
+     <div class="summary-row"><span class="label">種別</span><span class="value"><span class="tag">${state.workType}</span> <span class="tag">${state.selectedStyle || ''}</span></span></div>
+     ${state.staffName ? `<div class="summary-row"><span class="label">担当</span><span class="value">${state.staffName}</span></div>` : ''}
+     <div class="summary-row"><span class="label">作成日</span><span class="value">${date}</span></div>
+     <div class="summary-row"><span class="label">項目数</span><span class="value">${state.items.length}件</span></div>`;
+  document.getElementById('step5ItemList').innerHTML = state.items.map((item, i) =>
+    `<div class="item-row"><div class="item-num">${i + 1}</div><div class="item-text">${item}</div></div>`
+  ).join('');
+  document.getElementById('step5Result').innerHTML = '';
+}
+
+// override goTo to handle step5 init
+const _origGoTo = goTo;
+window.goTo = function(n) { _origGoTo(n); if (n === 5) goTo5(); };
+
+// ===== EXPORT TO SHEETS =====
+async function exportToSheets() {
+  const sheetsId = getKey('sheetsId');
+  const sheetsKey = getKey('sheetsKey');
+  const resultEl = document.getElementById('step5Result');
+  if (!sheetsId || !sheetsKey) {
+    resultEl.innerHTML = '<div class="error-banner">スプレッドシートIDとAPIキーが未設定です。<br><small>⚙ボタンから設定してください。</small></div>';
+    return;
+  }
+  showLoading('スプレッドシートに出力中...');
+  try {
+    const date = new Date().toLocaleDateString('ja-JP');
+    const rows = [
+      ['顧客名', '住所', '工事種別', 'スタイル', '担当者', '作成日', '項目番号', '工事内容'],
+      ...state.items.map((item, i) => [
+        i === 0 ? state.customerName : '',
+        i === 0 ? state.address : '',
+        i === 0 ? state.workType : '',
+        i === 0 ? state.selectedStyle || '' : '',
+        i === 0 ? state.staffName : '',
+        i === 0 ? date : '',
+        i + 1, item
+      ])
+    ];
+    const res = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetsId}/values/A1:append?valueInputOption=USER_ENTERED&key=${sheetsKey}`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ values: rows }) }
+    );
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error?.message || 'Sheets API エラー');
+    }
+    resultEl.innerHTML = '<div class="success-banner">✓ スプレッドシートに出力しました</div>';
+  } catch (err) {
+    resultEl.innerHTML = `<div class="error-banner">エラー：${err.message}</div>`;
+  } finally { hideLoading(); }
+}
+
+// ===== SHARE =====
+function shareData() {
+  const date = new Date().toLocaleDateString('ja-JP');
+  const text = `【リフォーム概算項目書】\n${date}\n顧客：${state.customerName} 様\n住所：${state.address}\n種別：${state.workType}（${state.selectedStyle || ''}）\n担当：${state.staffName || '-'}\n\n【工事項目】\n${state.items.map((item, i) => `${i + 1}. ${item}`).join('\n')}`;
+  if (navigator.share) { navigator.share({ text }); }
+  else { navigator.clipboard.writeText(text).then(() => showToast('クリップボードにコピーしました')); }
+}
+
+// ===== NEW CASE =====
+function newCase() {
+  if (!confirm('新規案件を始めますか？入力内容はリセットされます。')) return;
+  Object.assign(state, { customerName:'', address:'', workType:'リフォーム', staffName:'', memo:'',
+    photoDataUrl:null, photoBase64:null, photoMimeType:null,
+    selectedStyle:null, styleRefUrl:null, styleRefBase64:null, styleMemo:'',
+    generatedImageUrl:null, generatedImageBase64:null, items:[] });
+  document.getElementById('customerName').value = '';
+  document.getElementById('address').value = '';
+  document.getElementById('staffName').value = '';
+  document.getElementById('memo0').value = '';
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('photoUploadArea').style.display = 'block';
+  document.getElementById('step1Next').disabled = true;
+  document.querySelectorAll('.style-thumb-item').forEach(c => c.classList.remove('selected'));
+  document.getElementById('step2Next').disabled = true;
+  goTo(0);
+}
+</script>
+</body>
+</html>
