@@ -542,7 +542,7 @@ async function generateImage(extraInstruction = '') {
           'anthropic-version': '2023-06-01'
         },
         body: JSON.stringify({
-          model: 'claude-haiku-4-5',
+          model: 'claude-haiku-4-5-20251001',
           max_tokens: 200,
           messages: [{
             role: 'user',
@@ -568,7 +568,7 @@ async function generateImage(extraInstruction = '') {
       content_image: state.photoDataUrl,
       prompt: optimizedPrompt,
       negative_prompt: 'ugly, blurry, low quality, distorted, people, person, change room layout, change room structure, change room shape, add rooms, remove walls',
-      style_strength: 0.25,
+      style_strength: 0.15,
       number_of_images: 1,
       output_format: 'jpg'
     };
