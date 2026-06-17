@@ -546,13 +546,16 @@ async function generateImage(extraInstruction = '') {
 
     const PROXY = 'https://replicate-proxy.h113-yuhta.workers.dev';
 
-    const res = await fetch(`${PROXY}/v1/models/fofr/style-transfer/predictions`, {
+    const res = await fetch(`${PROXY}/v1/predictions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${replicateKey}`
       },
-      body: JSON.stringify({ input })
+      body: JSON.stringify({
+        version: 'f1023890703bc0a5a3a2c21b5e498833be5f6ef6e70e9daf6b9b3a4fd8309cf0',
+        input
+      })
     });
 
     const prediction = await res.json();
