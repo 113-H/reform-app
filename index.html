@@ -529,10 +529,13 @@ async function generateImage(extraInstruction = '') {
 
   showLoading('プロンプトを最適化中...');
   try {
-    // ① 日本語指示を最適な英語プロンプトに変換
-    const japaneseInput = [state.styleMemo, extraInstruction].filter(Boolean).join('、');
-    let optimizedPrompt = 'interior renovation, photorealistic, architectural photography, preserve original room structure and layout';
+    const styleText = state.selectedStyle || '';
+    const japaneseInput = [styleText, state.styleMemo, extraInstruction].filter(Boolean).join('、');
 
+    // デフォルトプロンプト（指示なしの場合）
+    let optimizedPrompt = `Apply a ${styleText || 'modern'} interior renovation style to this room. Keep all structural elements, room geometry, camera angle, composition, and perspective exactly unchanged. Preserve all existing objects, cabinets, walls, countertops, handles, outlets, and lighting fixtures. Photorealistic architectural interior rendering.`;
+
+    // Claude で日本語→flux-kontext-pro最適英語プロンプトに変換
     if (japaneseInput && claudeKey) {
       const convRes = await fetch('https://replicate-proxy.h113-yuhta.workers.dev/anthropic/v1/messages', {
         method: 'POST',
@@ -543,17 +546,24 @@ async function generateImage(extraInstruction = '') {
         },
         body: JSON.stringify({
           model: 'claude-haiku-4-5-20251001',
-          max_tokens: 200,
+          max_tokens: 300,
           messages: [{
             role: 'user',
-            content: `以下の日本語のリフォーム指示を、Stable Diffusionの画像生成AIに最適な英語プロンプトに変換してください。
-ルール：
-- 元の部屋の構造・レイアウト・形状は保持する指示を必ず含める
-- 変更する素材・色・スタイルを具体的な英語で表現する
-- カンマ区切りのキーワード形式で出力する
-- 余計な説明文は不要、プロンプトのみ出力する
-- 先頭に必ず "interior renovation, photorealistic, architectural photography, preserve original room structure and layout," を含める
+            content: `以下の日本語のリフォーム指示を、flux-kontext-proという画像編集AIに最適な英語プロンプトに変換してください。
 
+このAIの特徴：
+- 元画像の構造・構図・カメラアングルを完全に保持しながら指定部分だけを変更できる
+- 変更しない部分を明示的に「Keep ... exactly unchanged」と書くことが重要
+- 具体的な素材・色・テクスチャの指定が有効
+- 文章形式（箇条書きではなく）で書く
+
+出力ルール：
+- 英語のプロンプト文章のみ出力（説明文不要）
+- 必ず「Keep all cabinets, walls, countertop, handles, outlets, lighting fixtures, shadows, colors, materials, room geometry, camera angle, composition, and perspective exactly unchanged.」を含める
+- 変更する部分を具体的に最初に記述する
+- 最後に「Photorealistic architectural interior rendering.」を含める
+
+スタイル参考：${styleText || 'モダン'}
 日本語指示：${japaneseInput}`
           }]
         })
@@ -562,29 +572,24 @@ async function generateImage(extraInstruction = '') {
       optimizedPrompt = convData.content?.[0]?.text?.trim() || optimizedPrompt;
     }
 
-    showLoading('スタイル変換中（約6秒）...');
-
-    const input = {
-      content_image: state.photoDataUrl,
-      prompt: optimizedPrompt,
-      negative_prompt: 'ugly, blurry, low quality, distorted, people, person, change room layout, change room structure, change room shape, add rooms, remove walls',
-      style_strength: 0.15,
-      number_of_images: 1,
-      output_format: 'jpg'
-    };
-    if (state.styleRefUrl) input.style_image = state.styleRefUrl;
+    showLoading('リフォームイメージを生成中（約10秒）...');
 
     const PROXY = 'https://replicate-proxy.h113-yuhta.workers.dev';
 
-    const res = await fetch(`${PROXY}/v1/predictions`, {
+    const res = await fetch(`${PROXY}/v1/models/black-forest-labs/flux-kontext-pro/predictions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${replicateKey}`
       },
       body: JSON.stringify({
-        version: 'f1023890703bc0a5a3a2c21b5e498833be5f6ef6e70e9daf6b9b3a4fd8309cf0',
-        input
+        input: {
+          prompt: optimizedPrompt,
+          input_image: state.photoDataUrl,
+          output_format: 'jpg',
+          output_quality: 90,
+          safety_tolerance: 2
+        }
       })
     });
 
