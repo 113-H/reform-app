@@ -516,6 +516,7 @@ function showToast(msg) {
 
 async function generateImage(extraInstruction = '') {
   const replicateKey = getKey('replicateKey');
+  const claudeKey = getKey('claudeKey');
   if (!replicateKey) { openSettings(); return; }
   state.styleMemo = document.getElementById('styleMemo').value.trim();
   goTo(3);
@@ -526,19 +527,48 @@ async function generateImage(extraInstruction = '') {
   document.getElementById('saveImgBtn').disabled = true;
   document.getElementById('maskBtn').disabled = true;
 
-  showLoading('スタイル変換中（約6秒）...');
+  showLoading('プロンプトを最適化中...');
   try {
-    const prompt = [
-      'interior renovation, photorealistic, architectural photography',
-      state.styleMemo || '',
-      extraInstruction || ''
-    ].filter(Boolean).join(', ');
+    // ① 日本語指示を最適な英語プロンプトに変換
+    const japaneseInput = [state.styleMemo, extraInstruction].filter(Boolean).join('、');
+    let optimizedPrompt = 'interior renovation, photorealistic, architectural photography, preserve original room structure and layout';
+
+    if (japaneseInput && claudeKey) {
+      const convRes = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': claudeKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: 'claude-haiku-4-5',
+          max_tokens: 200,
+          messages: [{
+            role: 'user',
+            content: `以下の日本語のリフォーム指示を、Stable Diffusionの画像生成AIに最適な英語プロンプトに変換してください。
+ルール：
+- 元の部屋の構造・レイアウト・形状は保持する指示を必ず含める
+- 変更する素材・色・スタイルを具体的な英語で表現する
+- カンマ区切りのキーワード形式で出力する
+- 余計な説明文は不要、プロンプトのみ出力する
+- 先頭に必ず "interior renovation, photorealistic, architectural photography, preserve original room structure and layout," を含める
+
+日本語指示：${japaneseInput}`
+          }]
+        })
+      });
+      const convData = await convRes.json();
+      optimizedPrompt = convData.content?.[0]?.text?.trim() || optimizedPrompt;
+    }
+
+    showLoading('スタイル変換中（約6秒）...');
 
     const input = {
       content_image: state.photoDataUrl,
-      prompt,
-      negative_prompt: 'ugly, blurry, low quality, distorted, people, person',
-      style_strength: 0.6,
+      prompt: optimizedPrompt,
+      negative_prompt: 'ugly, blurry, low quality, distorted, people, person, change room layout, change room structure, change room shape, add rooms, remove walls',
+      style_strength: 0.25,
       number_of_images: 1,
       output_format: 'jpg'
     };
