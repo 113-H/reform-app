@@ -81,9 +81,13 @@
   .compare-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .compare-item { display: flex; flex-direction: column; gap: 6px; }
   .compare-label { font-size: 11px; font-weight: 500; color: var(--c-muted); text-align: center; }
-  .compare-img { width: 100%; border-radius: var(--radius-sm); object-fit: cover; aspect-ratio: 4/3; background: var(--c-border); display: block; }
+  .compare-img { width: 100%; border-radius: var(--radius-sm); object-fit: contain; aspect-ratio: 4/3; background: var(--c-bg); display: block; }
   .compare-placeholder { width: 100%; aspect-ratio: 4/3; border-radius: var(--radius-sm); background: var(--c-accent-bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
   .compare-placeholder span { font-size: 11px; color: var(--c-accent); }
+
+  /* ===== ROTATION CONTROLS ===== */
+  .rotate-controls { display: flex; gap: 8px; justify-content: center; }
+  .rotate-btn { padding: 6px 16px; border-radius: var(--radius-sm); border: 0.5px solid var(--c-border); background: var(--c-surface); font-size: 13px; cursor: pointer; color: var(--c-text); }
 
   /* ===== ITEM LIST ===== */
   .item-list { display: flex; flex-direction: column; gap: 0; border: 0.5px solid var(--c-border); border-radius: var(--radius); overflow: hidden; background: var(--c-surface); }
@@ -236,6 +240,10 @@
       <p>タップして撮影 / アルバムから選択</p>
     </div>
     <img id="photoPreview" class="photo-preview" style="display:none" />
+    <div id="rotateControls" class="rotate-controls" style="display:none;">
+      <button class="rotate-btn" onclick="rotatePhoto(-90)">↺ 左90°</button>
+      <button class="rotate-btn" onclick="rotatePhoto(90)">↻ 右90°</button>
+    </div>
     <div style="flex:1"></div>
     <button class="btn btn-primary" id="step1Next" onclick="goTo(2)" disabled>この写真で続ける →</button>
   </div>
@@ -491,6 +499,7 @@ async function handlePhoto(e) {
     document.getElementById('photoPreview').src = fixedDataUrl;
     document.getElementById('photoPreview').style.display = 'block';
     document.getElementById('photoUploadArea').style.display = 'none';
+    document.getElementById('rotateControls').style.display = 'flex';
     document.getElementById('step1Next').disabled = false;
     document.getElementById('step2Thumb').src = fixedDataUrl;
   } catch(err) {
@@ -500,7 +509,34 @@ async function handlePhoto(e) {
   }
 }
 
-// ===== LOADING =====
+// ===== ROTATE PHOTO =====
+let currentRotation = 0;
+function rotatePhoto(deg) {
+  currentRotation = (currentRotation + deg + 360) % 360;
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (currentRotation === 90 || currentRotation === 270) {
+      canvas.width = img.height; canvas.height = img.width;
+    } else {
+      canvas.width = img.width; canvas.height = img.height;
+    }
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(deg * Math.PI / 180);
+    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    ctx.restore();
+    const newDataUrl = canvas.toDataURL(state.photoMimeType, 0.92);
+    state.photoDataUrl = newDataUrl;
+    state.photoBase64 = newDataUrl.split(',')[1];
+    document.getElementById('photoPreview').src = newDataUrl;
+    document.getElementById('step2Thumb').src = newDataUrl;
+  };
+  img.src = state.photoDataUrl;
+}
+
+
 function showLoading(text) {
   document.getElementById('loadingText').textContent = text || '処理中...';
   document.getElementById('loadingOverlay').classList.add('active');
