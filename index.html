@@ -544,12 +544,13 @@ async function generateImage(extraInstruction = '') {
     };
     if (state.styleRefUrl) input.style_image = state.styleRefUrl;
 
-    const res = await fetch('https://api.replicate.com/v1/models/fofr/style-transfer/predictions', {
+    const PROXY = 'https://replicate-proxy.h113-yuhta.workers.dev';
+
+    const res = await fetch(`${PROXY}/v1/models/fofr/style-transfer/predictions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${replicateKey}`,
-        'Prefer': 'wait=30'
+        'Authorization': `Bearer ${replicateKey}`
       },
       body: JSON.stringify({ input })
     });
@@ -561,7 +562,7 @@ async function generateImage(extraInstruction = '') {
     let attempts = 0;
     while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < 20) {
       await new Promise(r => setTimeout(r, 2000));
-      const poll = await fetch(`https://api.replicate.com/v1/predictions/${result.id}`, {
+      const poll = await fetch(`${PROXY}/v1/predictions/${result.id}`, {
         headers: { 'Authorization': `Bearer ${replicateKey}` }
       });
       result = await poll.json();
