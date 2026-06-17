@@ -153,9 +153,12 @@
 </div>
 
 <!-- 全画面画像ビューワー -->
-<div id="imgViewer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:500; align-items:center; justify-content:center;" onclick="closeViewer()">
-  <img id="imgViewerImg" style="max-width:100%; max-height:100%; object-fit:contain;" />
-  <div style="position:absolute; top:16px; right:16px; color:#fff; font-size:28px; cursor:pointer;">×</div>
+<div id="imgViewer" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.95); z-index:500; align-items:center; justify-content:center; flex-direction:column; overflow-y:auto;" onclick="closeViewer()">
+  <div style="position:sticky; top:0; width:100%; display:flex; justify-content:space-between; align-items:center; padding:12px 16px; z-index:10;">
+    <div id="imgViewerGuide" style="display:none; color:#fff; font-size:13px; background:rgba(0,0,0,0.6); padding:6px 12px; border-radius:20px;">📱 画像を長押し → 写真に保存</div>
+    <div style="color:#fff; font-size:28px; cursor:pointer; margin-left:auto;">×</div>
+  </div>
+  <img id="imgViewerImg" style="max-width:100%; object-fit:contain;" />
 </div>
 <div class="modal" id="settingsModal">
   <div class="modal-content">
@@ -902,26 +905,64 @@ function openViewer(src) {
 }
 function closeViewer() {
   document.getElementById('imgViewer').style.display = 'none';
+  document.getElementById('imgViewerGuide').style.display = 'none';
 }
 
 
 function saveImage() {
   if (!state.generatedImageUrl) return;
-  const ts = Date.now();
-  const name = state.customerName || 'reform';
-  // 現状写真を保存
-  const a1 = document.createElement('a');
-  a1.href = state.photoDataUrl;
-  a1.download = `${name}_現状_${ts}.jpg`;
-  a1.click();
-  // 少し間を置いて生成後を保存
-  setTimeout(() => {
-    const a2 = document.createElement('a');
-    a2.href = state.generatedImageUrl;
-    a2.download = `${name}_生成後_${ts}.jpg`;
-    a2.click();
-  }, 500);
-  showToast('現状・生成後の2枚を保存しました');
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  if (isIOS) {
+    // iOSは長押し保存を案内
+    openSaveViewer();
+  } else {
+    // Android・PCは通常ダウンロード
+    const ts = Date.now();
+    const name = state.customerName || 'reform';
+    const a1 = document.createElement('a');
+    a1.href = state.photoDataUrl;
+    a1.download = `${name}_現状_${ts}.jpg`;
+    a1.click();
+    setTimeout(() => {
+      const a2 = document.createElement('a');
+      a2.href = state.generatedImageUrl;
+      a2.download = `${name}_生成後_${ts}.jpg`;
+      a2.click();
+    }, 500);
+    showToast('現状・生成後の2枚を保存しました');
+  }
+}
+
+function openSaveViewer() {
+  // 現状・生成後を縦に並べた保存用ビューアーを表示
+  const viewer = document.getElementById('imgViewer');
+  const viewerImg = document.getElementById('imgViewerImg');
+
+  // 2枚をcanvasで縦結合
+  const img1 = new Image();
+  const img2 = new Image();
+  img1.crossOrigin = 'anonymous';
+  img2.crossOrigin = 'anonymous';
+
+  img1.onload = () => {
+    img2.onload = () => {
+      const canvas = document.createElement('canvas');
+      const w = Math.max(img1.width, img2.width);
+      canvas.width = w;
+      canvas.height = img1.height + img2.height + 20;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#f8f7f4';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img1, 0, 0, w, img1.height);
+      ctx.drawImage(img2, 0, img1.height + 20, w, img2.height);
+      viewerImg.src = canvas.toDataURL('image/jpeg', 0.92);
+      // 案内テキストを表示
+      document.getElementById('imgViewerGuide').style.display = 'block';
+      viewer.style.display = 'flex';
+    };
+    img2.src = state.generatedImageUrl;
+  };
+  img1.src = state.photoDataUrl;
 }
 
 // ===== SKIP TO ANALYZE =====
